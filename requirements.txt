@@ -1,7 +1,0 @@
-aiogram==3.4.1
-fastapi
-uvicorn
-asyncpg
-sqlalchemy
-python-dotenv
-aiohttp
