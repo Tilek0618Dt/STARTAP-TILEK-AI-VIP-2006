@@ -107,3 +107,38 @@ async def cryptomus_webhook(req: Request):
                 minutes = int(inv.kind.split("_")[-1])
                 u.vip_music_minutes += minutes
                 await bot.send_message(u.tg_id, f"✅ VIP MUSIC минут кошулду: +{minutes} мин 🪉")
+
+            await s.commit()
+
+    return {"ok": True}
+
+async def _ref_reward(s: AsyncSession, buyer: User, paid_amount: float):
+    """
+    Referral rules:
+    - friend buys PLUS => referrer +$3
+    - if paid_amount >= 5 => referrer gets 7 days PLUS
+    - PRO => no bonus (handled outside)
+    """
+    if not buyer.referrer_tg_id:
+        return
+
+    ref_res = await s.execute(select(User).where(User.tg_id == buyer.referrer_tg_id))
+    ref_u = ref_res.scalar_one_or_none()
+    if not ref_u:
+        return
+
+    ref_u.ref_balance_usd += REF_BONUS_USD
+
+    if paid_amount >= REF_FREE_PLUS_MIN_PAID_USD:
+        # 7 күн PLUS (PRO эмес!)
+        p = PLANS["PLUS"]
+        ref_u.plan = "PLUS"
+        ref_u.plan_until = utcnow() + dt.timedelta(days=REF_FREE_PLUS_DAYS)
+        if ref_u.chat_left == 0 and ref_u.video_left == 0:
+            ref_u.chat_left, ref_u.video_left, ref_u.music_left = p.monthly_chat, p.monthly_video, p.monthly_music
+            ref_u.image_left, ref_u.voice_left, ref_u.doc_left = p.monthly_image, p.monthly_voice, p.monthly_doc
+            ref_u.last_monthly_reset = utcnow()
+
+        await bot.send_message(ref_u.tg_id, "🎁 Досум! Реферал иштеди: 7 күн PLUS ачылды 😎💎")
+
+                            
